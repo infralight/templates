@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Firefly Safe AWS Integration
+
+Parameters:
+  OutputS3Bucket:
+    Description: 'Please input the s3 bucket name where the redacted terraform state files will be written to.'
+    Type: String
+    MinLength: '3'
+    ConstraintDescription: Please input the s3 bucket name where the redacted terraform state files will be written to.
+
+Resources:
+  OutputBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Ref 'OutputS3Bucket'
+
+  RedatorLambdaPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'logs:*'
+            Resource:
+              - 'arn:aws:logs:*:*:*'
+
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - 'arn:aws:s3:::*/*.tfstate'
+
+          - Effect: Allow
+              Action:
+                - 's3:ListBucket'
+              Resource:
+                - '*'
+
+          - Effect: Allow
+            Action: 's3:*'
+            Resource:
+              - "Fn::GetAtt": [ "OutputBucket", "Arn" ]
+              - "Fn::Join": [
+                  "", [
+                    "Fn::GetAtt": [ "OutputBucket", "Arn" ],
+                    "/*"
+                ]
+              ]
+
+  RedactorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: terraform-redactor
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Ref RedactorLambdaPolicy
+
+  RedactorLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: terraform-redactor
+      Description: Redacting terraform state files.
+      Runtime: python3.7
+      Code:
+        S3Bucket: 'infralight-templates-public'
+        S3Key: 'unclassifier/unclassifier.zip'
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          INPUT_BUCKET: !Ref InputS3Bucket
+          OUTPUT_BUCKET: !Ref OutputBucket
+          CLASSIFIED_TYPES: !Ref ClassifiedResources
+      Role:
+        "Fn::GetAtt": [ "UnclassifierLambdaRole", "Arn" ]
+
+
+  RedactorScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "RedactorScheduleRule"
+      ScheduleExpression: "rate(15 minute)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - "RedactorLambdaFunction"
+              - "Arn"
+          Id: "TargetFunctionV1"
+
+  RedactorPermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: "RedactorLambdaFunction"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        Fn::GetAtt:
+          - "RedactorScheduledRule"
+          - "Arn"
+
+Outputs:
+  OutputS3BucketName:
+    Description: The name of the redacted output s3 bucket.
+    Value: !GetAtt OutputBucket.Arn
+
+  RedactorLambdaArn:
+    Description: Redactor lambda ARN
+    Value: !GetAtt RedactorLambdaFunction.Arn
