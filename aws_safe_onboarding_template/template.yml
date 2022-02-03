@@ -1,13 +1,42 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Firefly Safe AWS Integration
 
+Mappings:
+  FireflyEnvironment:
+    env:
+      organizationID: "094724549126"
+      SnsNameForConfirmCustomerDeployment: "handle-customer-actions"
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Parameters:
+          - ExternalID
+          - OutputS3Bucket
+    ParameterLabels:
+      ExternalID:
+        default: ExternalID
+      OutputS3Bucket:
+        default: OutputS3Bucket
+
 Parameters:
+  ExternalID:
+    Description: >-
+      The cross-account access role created by the stack will use this value for
+      its ExternalID. Do not change this value!
+    Type: String
+    MinLength: '2'
+    MaxLength: '1224'
+    AllowedPattern: '[\w+=,.@:\/-]*'
+    ConstraintDescription: 'Invalid ExternalID value.  Must match pattern [\w+=,.@:\/-]*'
+
   OutputS3Bucket:
     Description: 'Please input the s3 bucket name where the redacted terraform state files will be written to.'
     Type: String
     MinLength: '3'
     ConstraintDescription: Please input the s3 bucket name where the redacted terraform state files will be written to.
 
+Conditions: {}
 Resources:
   OutputBucket:
     Type: "AWS::S3::Bucket"
@@ -33,13 +62,18 @@ Resources:
               - 'arn:aws:s3:::*/*.tfstate'
 
           - Effect: Allow
-              Action:
-                - 's3:ListBucket'
-              Resource:
-                - '*'
+            Action:
+              - 's3:ListBucket'
+            Resource:
+              - '*'
 
           - Effect: Allow
-            Action: 's3:*'
+            Action:
+              - 's3:PutObject'
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:DeleteObject'
+              - 's3:GetObjectVersion'
             Resource:
               - "Fn::GetAtt": [ "OutputBucket", "Arn" ]
               - "Fn::Join": [
@@ -48,6 +82,11 @@ Resources:
                     "/*"
                 ]
               ]
+
+          - Effect: Allow
+              Action: 'lambda:InvokeFunction'
+              Resource:
+                - "Fn::GetAtt": [ "RedactorLambdaFunction", "Arn" ]
 
   RedactorLambdaRole:
     Type: AWS::IAM::Role
@@ -72,18 +111,19 @@ Resources:
       FunctionName:
         Fn::Sub: terraform-redactor
       Description: Redacting terraform state files.
-      Runtime: python3.7
+      Runtime: go1.x
       Code:
-        S3Bucket: 'infralight-templates-public'
-        S3Key: 'unclassifier/unclassifier.zip'
-      Handler: index.lambda_handler
-      MemorySize: 128
-      Timeout: 30
+        ImagUri: '094724549126.dkr.ecr.us-east-1.amazonaws.com/terraform_redactor'
+      Handler: consumer/handler.handler
+      MemorySize: 1024
+      Timeout: 900
       Environment:
         Variables:
-          INPUT_BUCKET: !Ref InputS3Bucket
-          OUTPUT_BUCKET: !Ref OutputBucket
-          CLASSIFIED_TYPES: !Ref ClassifiedResources
+          FIREFLY_BUCKET_NAME: !Ref OutputBucket
+          MAX_GO_ROUTINES: 10
+          MAX_BUCKETS_SCAN: 100
+          MAX_FILES_SCAN: 5000
+          MAX_FILES_REDACTION: 1000
       Role:
         "Fn::GetAtt": [ "UnclassifierLambdaRole", "Arn" ]
 
@@ -113,6 +153,88 @@ Resources:
           - "RedactorScheduledRule"
           - "Arn"
 
+
+  FireflyReadonlyPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: [
+                'apigateway:GET',
+                'cloudwatch:ListDashboards',
+                'cloudwatch:GetDashboard',
+                'codebuild:BatchGetProjects',
+                'ec2:SearchTransitGatewayRoutes',
+                'eks:ListNodegroups',
+                'eks:ListFargateProfiles',
+                'eks:ListTagsForResource',
+                'eks:DescribeNodegroup',
+                'eks:DescribeFargateProfile',
+                'states:DescribeStateMachine',
+                'states:ListStateMachines',
+                'states:ListTagsForResource',
+                'sns:ListSubscriptionsByTopic',
+                'sns:ListTopics',
+                'sns:ListSubscriptions',
+                'ses:GetIdentityMailFromDomainAttributes',
+                'ses:GetIdentityVerificationAttributes',
+                'sns:GetSubscriptionAttributes',
+                'ses:GetIdentityDkimAttributes',
+                'ses:ListIdentities',
+                'elasticfilesystem:DescribeLifecycleConfiguration',
+                'ecr-public:ListTagsForResource',
+                'ecr:DescribeRepositories',
+                'appconfig:ListApplications',
+                'appconfig:ListTagsForResource',
+                'eks:ListIdentityProviderConfigs',
+                'eks:DescribeIdentityProviderConfig',
+                'eks:ListAddons',
+                'eks:DescribeAddon',
+                'elasticfilesystem:DescribeAccessPoints',
+                'elasticfilesystem:ListTagsForResource',
+                's3:ListBucket'
+            ]
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+            Resource:
+              - "Fn::Join": [
+                  "", [
+                    "Fn::GetAtt": [ "OutputBucket", "Arn" ],
+                    "/*"
+                ]
+              ]
+
+  FireflyCrossAccountAccessRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: 'firefly-caa-role'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !FindInMap
+                    - FireflyEnvironment
+                    - env
+                    - organizationID
+                  - ':root'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref ExternalID
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/SecurityAudit'
+        - 'arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess'
+        - !Ref FireflyReadonlyPolicy
+
 Outputs:
   OutputS3BucketName:
     Description: The name of the redacted output s3 bucket.
@@ -121,3 +243,19 @@ Outputs:
   RedactorLambdaArn:
     Description: Redactor lambda ARN
     Value: !GetAtt RedactorLambdaFunction.Arn
+
+  RoleARN:
+    Description: >-
+      Cross-account access role ARN to share with Firefly
+      integration
+    Value: !GetAtt
+      - FireflyCrossAccountAccessRole
+      - Arn
+
+  ExternalID:
+    Description: ExternalID to share with Firefly
+    Value: !Ref ExternalID
+
+  TemplateVersion:
+    Description: gofirefly.io template version
+    Value: 1.1.0
