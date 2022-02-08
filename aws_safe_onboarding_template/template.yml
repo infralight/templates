@@ -109,6 +109,7 @@ Resources:
         Fn::Sub: terraform-redactor
       Description: Redacting terraform state files.
       Runtime: go1.x
+      PackageType: Image
       ImagUri: '094724549126.dkr.ecr.us-east-1.amazonaws.com/terraform_redactor'
       Handler: consumer/handler.handler
       MemorySize: 1024
