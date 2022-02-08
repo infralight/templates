@@ -84,9 +84,10 @@ Resources:
               ]
 
           - Effect: Allow
-              Action: 'lambda:InvokeFunction'
-              Resource:
-                - "Fn::GetAtt": [ "RedactorLambdaFunction", "Arn" ]
+            Action:
+              - 'lambda:InvokeFunction'
+            Resource:
+              - "Fn::GetAtt": [ "RedactorLambdaFunction", "Arn" ]
 
   RedactorLambdaRole:
     Type: AWS::IAM::Role
@@ -103,7 +104,7 @@ Resources:
                 - lambda.amazonaws.com
         Version: 2012-10-17
       ManagedPolicyArns:
-        - !Ref RedactorLambdaPolicy
+        - !Ref RedatorLambdaPolicy
 
   RedactorLambdaFunction:
     Type: AWS::Lambda::Function
@@ -125,7 +126,7 @@ Resources:
           MAX_FILES_SCAN: 5000
           MAX_FILES_REDACTION: 1000
       Role:
-        "Fn::GetAtt": [ "UnclassifierLambdaRole", "Arn" ]
+        "Fn::GetAtt": [ "RedactorLambdaRole", "Arn" ]
 
 
   RedactorScheduledRule:
