@@ -34,6 +34,8 @@ Parameters:
     Description: 'Please input the s3 bucket name where the redacted terraform state files will be written to.'
     Type: String
     MinLength: '3'
+    MaxLength: '63'
+    AllowedPattern: '[a-z0-9\-\.]*'
     ConstraintDescription: Please input the s3 bucket name where the redacted terraform state files will be written to.
 
 Conditions: {}
@@ -82,12 +84,6 @@ Resources:
                     "/*"
                 ]
               ]
-
-          - Effect: Allow
-            Action:
-              - 'lambda:InvokeFunction'
-            Resource:
-              - "Fn::GetAtt": [ "RedactorLambdaFunction", "Arn" ]
 
   RedactorLambdaRole:
     Type: AWS::IAM::Role
