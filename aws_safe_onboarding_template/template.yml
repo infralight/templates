@@ -110,7 +110,7 @@ Resources:
       Description: Redacting terraform state files.
       PackageType: Image
       Code:
-        ImageUri: '094724549126.dkr.ecr.us-east-1.amazonaws.com/terraform_redactor'
+        ImageUri: '094724549126.dkr.ecr.us-west-2.amazonaws.com/terraform_redactor'
       MemorySize: 1024
       Timeout: 900
       Environment:
