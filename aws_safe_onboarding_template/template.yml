@@ -34,6 +34,7 @@ Parameters:
   RedactedOutputS3Bucket:
     Description: 'Please input the s3 bucket name where the redacted terraform state files will be written to.'
     Type: String
+    Default: "firefly-terraform-redactor"
     MinLength: '3'
     MaxLength: '63'
     AllowedPattern: '[a-z0-9\-\.]*'
@@ -44,7 +45,11 @@ Resources:
   FireflyOutputBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Ref RedactedOutputS3Bucket
+      BucketName:
+        - !Join
+          - "-"
+          - - !Ref RedactedOutputS3Bucket
+            - !Ref "AWS::AccountId"
 
   FireflyRedatorLambdaPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
@@ -66,7 +71,11 @@ Resources:
             Resource:
               - !Join
                 - ""
-                - - 'arn:aws:lambda:*:*:function:'
+                - - 'arn:aws:lambda:'
+                  - !Ref "AWS::Region"
+                  - ':'
+                  - !Ref "AWS::AccountId"
+                  - ':function:'
                   - !FindInMap
                     - FireflyEnvironment
                     - env
@@ -82,6 +91,7 @@ Resources:
             Action:
               - 's3:ListBucket'
               - 's3:GetBucketLocation'
+              - 's3:ListAllMyBuckets'
             Resource:
               - 'arn:aws:s3:::*'
 
