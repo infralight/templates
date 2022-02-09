@@ -111,7 +111,6 @@ Resources:
       PackageType: Image
       Code:
         ImageUri: '094724549126.dkr.ecr.us-east-1.amazonaws.com/terraform_redactor'
-      Handler: consumer/handler.handler
       MemorySize: 1024
       Timeout: 900
       Environment:
