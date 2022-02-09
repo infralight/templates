@@ -7,18 +7,16 @@ Mappings:
       organizationID: "094724549126"
       SnsNameForConfirmCustomerDeployment: "handle-customer-actions"
       redactorLambdaName: "firefly-terraform-redactor"
+      redactedOutputS3BucketBaseName: "firefly-terraform-redactor"
 
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
       - Parameters:
           - ExternalID
-          - RedactedOutputS3Bucket
     ParameterLabels:
       ExternalID:
         default: ExternalID
-      RedactedOutputS3Bucket:
-        default: RedactedOutputS3Bucket
 
 Parameters:
   ExternalID:
@@ -31,15 +29,6 @@ Parameters:
     AllowedPattern: '[\w+=,.@:\/-]*'
     ConstraintDescription: 'Invalid ExternalID value.  Must match pattern [\w+=,.@:\/-]*'
 
-  RedactedOutputS3Bucket:
-    Description: 'Please input the s3 bucket name where the redacted terraform state files will be written to.'
-    Type: String
-    Default: "firefly-terraform-redactor"
-    MinLength: '3'
-    MaxLength: '63'
-    AllowedPattern: '[a-z0-9\-\.]*'
-    ConstraintDescription: Please input the s3 bucket name where the redacted terraform state files will be written to.
-
 Conditions: {}
 Resources:
   FireflyOutputBucket:
@@ -47,8 +36,11 @@ Resources:
     Properties:
       BucketName:
         - !Join
-          - "-"
-          - - !Ref RedactedOutputS3Bucket
+          - ""
+          - - !FindInMap
+              - FireflyEnvironment
+              - env
+              - redactedOutputS3BucketBaseName
             - !Ref "AWS::AccountId"
 
   FireflyRedatorLambdaPolicy:
@@ -140,7 +132,12 @@ Resources:
       Description: Redacting terraform state files.
       PackageType: Image
       Code:
-        ImageUri: '094724549126.dkr.ecr.us-east-1.amazonaws.com/terraform_redactor:latest'
+        ImageUri:
+          - !Join
+            - ""
+            - - '094724549126.dkr.ecr.'
+              - !Ref "AWS::Region"
+              - '.amazonaws.com/terraform_redactor:latest'
       MemorySize: 1024
       Timeout: 900
       Environment:
