@@ -231,6 +231,11 @@ Resources:
                     "/*"
                 ]
               ]
+          - Effect: Allow
+              Action:
+                - 'lambda:InvokeFunction'
+              Resource:
+                - "Fn::GetAtt": [ "FireflyRedactorLambdaFunction", "Arn" ],
 
   FireflyCrossAccountAccessRole:
     Type: 'AWS::IAM::Role'
