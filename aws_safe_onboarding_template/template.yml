@@ -6,18 +6,19 @@ Mappings:
     env:
       organizationID: "094724549126"
       SnsNameForConfirmCustomerDeployment: "handle-customer-actions"
+      redactorLambdaName: "firefly-terraform-redactor"
 
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
       - Parameters:
           - ExternalID
-          - OutputS3Bucket
+          - RedactedOutputS3Bucket
     ParameterLabels:
       ExternalID:
         default: ExternalID
-      OutputS3Bucket:
-        default: OutputS3Bucket
+      RedactedOutputS3Bucket:
+        default: RedactedOutputS3Bucket
 
 Parameters:
   ExternalID:
@@ -30,7 +31,7 @@ Parameters:
     AllowedPattern: '[\w+=,.@:\/-]*'
     ConstraintDescription: 'Invalid ExternalID value.  Must match pattern [\w+=,.@:\/-]*'
 
-  OutputS3Bucket:
+  RedactedOutputS3Bucket:
     Description: 'Please input the s3 bucket name where the redacted terraform state files will be written to.'
     Type: String
     MinLength: '3'
@@ -40,12 +41,12 @@ Parameters:
 
 Conditions: {}
 Resources:
-  OutputBucket:
+  FireflyOutputBucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Ref 'OutputS3Bucket'
+      BucketName: !Ref RedactedOutputS3Bucket
 
-  RedatorLambdaPolicy:
+  FireflyRedatorLambdaPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
       PolicyDocument:
@@ -53,9 +54,23 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - 'logs:*'
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
             Resource:
               - 'arn:aws:logs:*:*:*'
+
+          - Effect: Allow
+            Action:
+              - 'lambda:InvokeFunction'
+            Resource:
+              - !Join
+                - ""
+                - - 'arn:aws:lambda:*:*:function:'
+                  - !FindInMap
+                    - FireflyEnvironment
+                    - env
+                    - organizationID
 
           - Effect: Allow
             Action:
@@ -66,8 +81,9 @@ Resources:
           - Effect: Allow
             Action:
               - 's3:ListBucket'
+              - 's3:GetBucketLocation'
             Resource:
-              - '*'
+              - 'arn:aws:s3:::*'
 
           - Effect: Allow
             Action:
@@ -77,19 +93,22 @@ Resources:
               - 's3:DeleteObject'
               - 's3:GetObjectVersion'
             Resource:
-              - "Fn::GetAtt": [ "OutputBucket", "Arn" ]
+              - "Fn::GetAtt": [ "FireflyOutputBucket", "Arn" ]
               - "Fn::Join": [
                   "", [
-                    "Fn::GetAtt": [ "OutputBucket", "Arn" ],
+                    "Fn::GetAtt": [ "FireflyOutputBucket", "Arn" ],
                     "/*"
                 ]
               ]
 
-  RedactorLambdaRole:
+  FireflyRedactorLambdaRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName:
-        Fn::Sub: terraform-redactor
+        Fn::Sub: !FindInMap
+                    - FireflyEnvironment
+                    - env
+                    - organizationID
       AssumeRolePolicyDocument:
         Statement:
           - Action:
@@ -100,31 +119,34 @@ Resources:
                 - lambda.amazonaws.com
         Version: 2012-10-17
       ManagedPolicyArns:
-        - !Ref RedatorLambdaPolicy
+        - !Ref FireflyRedatorLambdaPolicy
 
-  RedactorLambdaFunction:
+  FireflyRedactorLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName:
-        Fn::Sub: terraform-redactor
+        Fn::Sub: !FindInMap
+                    - FireflyEnvironment
+                    - env
+                    - organizationID
       Description: Redacting terraform state files.
       PackageType: Image
       Code:
-        ImageUri: '094724549126.dkr.ecr.us-west-2.amazonaws.com/terraform_redactor:latest'
+        ImageUri: '094724549126.dkr.ecr.us-east-1.amazonaws.com/terraform_redactor:latest'
       MemorySize: 1024
       Timeout: 900
       Environment:
         Variables:
-          FIREFLY_BUCKET_NAME: !Ref OutputBucket
+          FIREFLY_BUCKET_NAME: !Ref FireflyOutputBucket
           MAX_GO_ROUTINES: 10
           MAX_BUCKETS_SCAN: 100
           MAX_FILES_SCAN: 5000
           MAX_FILES_REDACTION: 1000
       Role:
-        "Fn::GetAtt": [ "RedactorLambdaRole", "Arn" ]
+        "Fn::GetAtt": [ "FireflyRedactorLambdaRole", "Arn" ]
 
 
-  RedactorScheduledRule:
+  FireflyRedactorScheduledRule:
     Type: AWS::Events::Rule
     Properties:
       Description: "RedactorScheduleRule"
@@ -133,20 +155,20 @@ Resources:
       Targets:
         - Arn:
             Fn::GetAtt:
-              - "RedactorLambdaFunction"
+              - "FireflyRedactorLambdaFunction"
               - "Arn"
           Id: "TargetFunctionV1"
 
-  RedactorPermissionForEventsToInvokeLambda:
+  FireflyRedactorPermissionForEventsToInvokeLambda:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName:
-        Ref: "RedactorLambdaFunction"
+        Ref: "FireflyRedactorLambdaFunction"
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
       SourceArn:
         Fn::GetAtt:
-          - "RedactorScheduledRule"
+          - "FireflyRedactorScheduledRule"
           - "Arn"
 
 
@@ -200,7 +222,7 @@ Resources:
             Resource:
               - "Fn::Join": [
                   "", [
-                    "Fn::GetAtt": [ "OutputBucket", "Arn" ],
+                    "Fn::GetAtt": [ "FireflyOutputBucket", "Arn" ],
                     "/*"
                 ]
               ]
@@ -232,9 +254,9 @@ Resources:
         - !Ref FireflyReadonlyPolicy
 
 Outputs:
-  OutputS3BucketName:
+  RedactedOutputS3BucketName:
     Description: The name of the redacted output s3 bucket.
-    Value: !GetAtt OutputBucket.Arn
+    Value: !GetAtt FireflyOutputBucket.Name
 
   RedactorLambdaArn:
     Description: Redactor lambda ARN
