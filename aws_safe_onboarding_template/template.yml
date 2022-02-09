@@ -35,13 +35,13 @@ Resources:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName:
-        - !Join
-          - ""
-          - - !FindInMap
-              - FireflyEnvironment
-              - env
-              - redactedOutputS3BucketBaseName
-            - !Ref "AWS::AccountId"
+        !Join
+        - ""
+        - - !FindInMap
+            - FireflyEnvironment
+            - env
+            - redactedOutputS3BucketBaseName
+          - !Ref "AWS::AccountId"
 
   FireflyRedatorLambdaPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
@@ -133,11 +133,11 @@ Resources:
       PackageType: Image
       Code:
         ImageUri:
-          - !Join
-            - ""
-            - - '094724549126.dkr.ecr.'
-              - !Ref "AWS::Region"
-              - '.amazonaws.com/terraform_redactor:latest'
+          !Join
+          - ""
+          - - '094724549126.dkr.ecr.'
+            - !Ref "AWS::Region"
+            - '.amazonaws.com/terraform_redactor:latest'
       MemorySize: 1024
       Timeout: 900
       Environment:
