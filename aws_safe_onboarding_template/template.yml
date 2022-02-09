@@ -128,7 +128,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Description: "RedactorScheduleRule"
-      ScheduleExpression: "rate(15 minute)"
+      ScheduleExpression: "rate(15 minutes)"
       State: "ENABLED"
       Targets:
         - Arn:
