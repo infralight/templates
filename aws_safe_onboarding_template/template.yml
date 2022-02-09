@@ -36,7 +36,7 @@ Resources:
     Properties:
       BucketName:
         !Join
-        - ""
+        - "-"
         - - !FindInMap
             - FireflyEnvironment
             - env
