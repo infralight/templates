@@ -43,7 +43,7 @@ Resources:
             - redactedOutputS3BucketBaseName
           - !Ref "AWS::AccountId"
 
-  FireflyRedatorLambdaPolicy:
+  FireflyRedactorLambdaPolicy:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
       PolicyDocument:
@@ -120,7 +120,7 @@ Resources:
                 - lambda.amazonaws.com
         Version: 2012-10-17
       ManagedPolicyArns:
-        - !Ref FireflyRedatorLambdaPolicy
+        - !Ref FireflyRedactorLambdaPolicy
 
   FireflyRedactorLambdaFunction:
     Type: 'AWS::Lambda::Function'
