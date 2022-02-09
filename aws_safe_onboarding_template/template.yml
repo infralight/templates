@@ -42,7 +42,7 @@ Parameters:
 Conditions: {}
 Resources:
   FireflyOutputBucket:
-    Type: "AWS::S3::Bucket"
+    Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Ref RedactedOutputS3Bucket
 
@@ -70,7 +70,7 @@ Resources:
                   - !FindInMap
                     - FireflyEnvironment
                     - env
-                    - organizationID
+                    - redactorLambdaName
 
           - Effect: Allow
             Action:
@@ -102,13 +102,12 @@ Resources:
               ]
 
   FireflyRedactorLambdaRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
-      RoleName:
-        Fn::Sub: !FindInMap
+      RoleName: !FindInMap
                     - FireflyEnvironment
                     - env
-                    - organizationID
+                    - redactorLambdaName
       AssumeRolePolicyDocument:
         Statement:
           - Action:
@@ -122,13 +121,12 @@ Resources:
         - !Ref FireflyRedatorLambdaPolicy
 
   FireflyRedactorLambdaFunction:
-    Type: AWS::Lambda::Function
+    Type: 'AWS::Lambda::Function'
     Properties:
-      FunctionName:
-        Fn::Sub: !FindInMap
+      FunctionName: !FindInMap
                     - FireflyEnvironment
                     - env
-                    - organizationID
+                    - redactorLambdaName
       Description: Redacting terraform state files.
       PackageType: Image
       Code:
@@ -147,7 +145,7 @@ Resources:
 
 
   FireflyRedactorScheduledRule:
-    Type: AWS::Events::Rule
+    Type: 'AWS::Events::Rule'
     Properties:
       Description: "RedactorScheduleRule"
       ScheduleExpression: "rate(15 minutes)"
@@ -160,7 +158,7 @@ Resources:
           Id: "TargetFunctionV1"
 
   FireflyRedactorPermissionForEventsToInvokeLambda:
-    Type: AWS::Lambda::Permission
+    Type: 'AWS::Lambda::Permission'
     Properties:
       FunctionName:
         Ref: "FireflyRedactorLambdaFunction"
@@ -255,12 +253,12 @@ Resources:
 
 Outputs:
   RedactedOutputS3BucketName:
-    Description: The name of the redacted output s3 bucket.
-    Value: !GetAtt FireflyOutputBucket.Name
+    Description: The ARN of the redacted output s3 bucket.
+    Value: !GetAtt FireflyOutputBucket.Arn
 
   RedactorLambdaArn:
     Description: Redactor lambda ARN
-    Value: !GetAtt RedactorLambdaFunction.Arn
+    Value: !GetAtt FireflyRedactorLambdaFunction.Arn
 
   RoleARN:
     Description: >-
