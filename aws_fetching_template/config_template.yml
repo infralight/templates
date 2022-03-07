@@ -32,6 +32,27 @@ Resources:
         Version: 2012-10-17
         Statement:
           - Effect: Allow
+            Action:
+              - 's3:Get*'
+              - 's3:List*'
+            Resource:
+              - !Join [':', ['arn:aws:s3::', !Ref 'BucketName']]
+              - "Fn::Join": [
+                "", [
+                !Join [':', ['arn:aws:s3::', !Ref 'BucketName']],
+                "/*"
+              ]
+              ]
+              
+              
+          - Effect: Allow
+            Action:
+              - 'kms:Decrypt'
+            Resource:
+              - !Join [':', ['arn:aws:kms:*', !Ref 'AWS::AccountId', 'key/*']]
+
+        Statement:
+          - Effect: Allow
             Action: [
               'apigateway:GET',
               'cloudwatch:ListDashboards',
