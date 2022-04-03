@@ -164,6 +164,22 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
+              - 'chime:GetVoiceConnector*'
+              - 'chime:ListTagsForResource'
+              - 'chime:ListVoiceConnector*'
+              - 'codecommit:GetApprovalRuleTemplate'
+              - 'codecommit:GetRepository'
+              - 'codecommit:GetRepositoryTriggers'
+            Resource:
+              - '*'
+  S3SpecificWritePermission:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
               - 'kms:Decrypt'
             Resource:
               - !Join [':', ['arn:aws:kms:*', !Ref 'AWS::AccountId', 'key/*']]
@@ -176,17 +192,7 @@ Resources:
               - 'arn:aws:s3:::elasticbeanstalk-*/*'
               - !Join ['/', [!Join ['-', ['arn:aws:s3:::aws-emr-resources', !Ref 'AWS::AccountId', '*']], '*']]
         
-        Statement:
-          - Effect: Allow
-            Action:
-              - 'chime:GetVoiceConnector*'
-              - 'chime:ListTagsForResource'
-              - 'chime:ListVoiceConnector*'
-              - 'codecommit:GetApprovalRuleTemplate'
-              - 'codecommit:GetRepository'
-              - 'codecommit:GetRepositoryTriggers'
-            Resource:
-              - '*'
+      
   FireflyCrossAccountAccessRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -213,6 +219,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
         - !Ref FireflyReadonlyBlacklist
         - !Ref FireflyReadonlySpecialWhitelist
+        - !Ref S3SpecificWritePermission
 Outputs:
   RoleARN:
     Description: >-
