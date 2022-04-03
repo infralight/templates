@@ -25,7 +25,7 @@ Parameters:
     ConstraintDescription: 'Invalid ExternalID value.  Must match pattern [\w+=,.@:\/-]*'
 Conditions: {}
 Resources:
-  FireflyReadonlyBlacklist:
+  FireflyReadonlyDenylist:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
       PolicyDocument:
@@ -154,24 +154,16 @@ Resources:
               - 'wafv2:CheckCapacity'
               - 'workdocs:CheckAlias'
               - 'workmail:Search*'
+              - 'cognito-identity:GetCredentialsForIdentity'
+              - 'cognito-identity:GetIdentityPoolRoles'
+              - 'cognito-identity:GetOpenId*'
+              - 'cognito-idp:GetSigningCertificate'
+              - 'connect:GetFederationToken'
+              - 'secretsmanager:GetRandomPassword'
+              - 'secretsmanager:GetSecretValue'
             Resource:
               - '*'
-  FireflyReadonlySpecialWhitelist:
-    Type: 'AWS::IAM::ManagedPolicy'
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - 'chime:GetVoiceConnector*'
-              - 'chime:ListTagsForResource'
-              - 'chime:ListVoiceConnector*'
-              - 'codecommit:GetApprovalRuleTemplate'
-              - 'codecommit:GetRepository'
-              - 'codecommit:GetRepositoryTriggers'
-            Resource:
-              - '*'
+
   S3SpecificWritePermission:
     Type: 'AWS::IAM::ManagedPolicy'
     Properties:
@@ -183,7 +175,7 @@ Resources:
               - 'kms:Decrypt'
             Resource:
               - !Join [':', ['arn:aws:kms:*', !Ref 'AWS::AccountId', 'key/*']]
-        Statement:
+
           - Effect: Deny
             Action:
               - 's3:GetObject'
@@ -217,8 +209,7 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/SecurityAudit'
         - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
-        - !Ref FireflyReadonlyBlacklist
-        - !Ref FireflyReadonlySpecialWhitelist
+        - !Ref FireflyReadonlyDenylist
         - !Ref S3SpecificWritePermission
 Outputs:
   RoleARN:
