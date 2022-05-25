@@ -23,7 +23,7 @@ jobs:
       with:
         args: --acl public-read --follow-symlinks --exclude='*' --include='config_template_allow_list.yml'
       env:
-        SOURCE_DIR: 'aws_fetching_template'
+        SOURCE_DIR: 'aws_fetching_template_allow_list'
         AWS_S3_BUCKET: ${{ env.S3_BUCKET_CLI }}
     - name: Slack Notification
       if: ${{ success() }}
